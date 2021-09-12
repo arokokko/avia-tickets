@@ -1,12 +1,15 @@
 import api from '../services/apiService';
+import { formatDate } from '../helpers/date';
 
 class Locations {
-    constructor(api) {
+    constructor(api, helpers) {
         this.api = api;
         this.countries = null;
         this.cities = null;
         this.airlines = {};
         this.shortCitiesList = {};
+        this.lastSearch = null;
+        this.formatDate = helpers.formatDate;
     }
     async init() {
         const response = await Promise.all([this.api.countries(), this.api.cities(), this.api.airlines()]);
@@ -16,7 +19,6 @@ class Locations {
         this.cities = this.serializeCities(cities);
         this.shortCitiesList = this.createShortCitiesList(this.cities);
         this.airlines = this.serializeAirlines(airlines);
-        console.log(this.cities);
         return response;
     }
     serializeContries(countries) {
@@ -54,6 +56,10 @@ class Locations {
         return city.code;
     }
 
+    getCityNameByCode(code) {
+        return this.cities[code].name;
+    }
+
     getAirlineNameByCode(code) {
         return this.airlines[code] ? this.airlines[code].name : '';
     }
@@ -76,10 +82,25 @@ class Locations {
 
     async fetchTickets(params) {
         const response = await this.api.prices(params);
-        console.log(response);
+        this.lastSearch = this.serializeTickets(response.data);
+        console.log(this.lastSearch);
+    }
+
+    serializeTickets(tickets) {
+        return Object.values(tickets).map(ticket => {
+            return {
+                ...ticket,
+                origin_name: this.getCityNameByCode(ticket.origin),
+                destination_name: this.getCityNameByCode(ticket.destination),
+                airline_logo: this.getAirlineLogoByCode(ticket.airline),
+                airline_name: this.getAirlineNameByCode(ticket.airline),
+                departure_at: this.formatDate(ticket.departure_at, 'd MMM yyyy HH:mm'),
+                return_at: this.formatDate(ticket.return_at, 'd MMM yyyy HH:mm'),
+            }
+        })
     }
 }
 
-const locations = new Locations(api);
+const locations = new Locations(api, { formatDate });
 
 export default locations;
